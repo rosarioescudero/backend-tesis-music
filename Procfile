@@ -1,1 +1,1 @@
-web: gunicorn analisis_api:app
+web: python analisis_api.py
