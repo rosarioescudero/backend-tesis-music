@@ -1,0 +1,14 @@
+numpy==1.26.4
+opencv-python==4.8.0.74
+mediapipe==0.10.14
+librosa
+scipy
+pandas
+matplotlib
+seaborn
+moviepy
+imageio-ffmpeg
+plotly
+dtaidistance
+flask
+flask-cors
