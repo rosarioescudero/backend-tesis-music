@@ -1,6 +1,6 @@
 numpy==1.26.4
 opencv-python-headless==4.8.0.74
-mediapipe==0.10.14
+mediapipe
 librosa
 scipy
 pandas
