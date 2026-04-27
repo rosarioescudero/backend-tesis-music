@@ -203,7 +203,7 @@ def run_real_analysis(video_path: Path, metronome_path: Path, output_dir: Path):
     return manifest, logs
 
 
-@app.get("/health")
+@app.route("/health", methods=["GET"])
 def health():
     return jsonify({"status": "ok", "service": "analisis_api"})
 
