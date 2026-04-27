@@ -214,6 +214,26 @@ def analizar():
         datos = request.get_json(silent=True) or {}
         ruta_video = datos.get("ruta_video")
         ruta_audio_metronomo = datos.get("ruta_audio_metronomo")
+
+        import requests
+        import tempfile
+        
+        # Si es URL, descargar el video
+        if isinstance(ruta_video, str) and ruta_video.startswith("http"):
+            response = requests.get(ruta_video)
+            
+            if response.status_code != 200:
+                return jsonify({
+                    "status": "error",
+                    "message": f"No se pudo descargar el video desde la URL: {ruta_video}"
+                }), 400
+        
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
+            
+            with open(temp_file.name, "wb") as f:
+                f.write(response.content)
+            
+            ruta_video = temp_file.name
         nombre_archivo = datos.get("nombre_archivo")
         output_dir_raw = datos.get("output_dir")
 
