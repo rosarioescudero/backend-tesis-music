@@ -208,7 +208,7 @@ def health():
     return jsonify({"status": "ok", "service": "analisis_api"})
 
 
-@app.post("/analizar")
+@app.route("/analizar", methods=["POST"])
 def analizar():
     try:
         datos = request.get_json(silent=True) or {}
