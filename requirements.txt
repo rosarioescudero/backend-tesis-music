@@ -12,3 +12,4 @@ plotly
 dtaidistance
 flask
 flask-cors
+gunicorn
