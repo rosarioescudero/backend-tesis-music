@@ -213,6 +213,7 @@ def analizar():
     try:
         datos = request.get_json(silent=True) or {}
         ruta_video = datos.get("ruta_video")
+        print("DEBUG ruta_video ANTES:", ruta_video)
         ruta_audio_metronomo = datos.get("ruta_audio_metronomo")
 
         import requests
@@ -234,6 +235,7 @@ def analizar():
                 f.write(response.content)
             
             ruta_video = temp_file.name
+            print("DEBUG ruta_video DESPUÉS:", ruta_video)
         nombre_archivo = datos.get("nombre_archivo")
         output_dir_raw = datos.get("output_dir")
 
