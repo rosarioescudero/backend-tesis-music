@@ -245,8 +245,18 @@ def analizar():
             return jsonify({"status": "error", "message": "Falta 'ruta_audio_metronomo' en la petición."}), 400
 
         video_path = Path(ruta_video)
-        metronome_path = Path(ruta_audio_metronomo)
+
+        # 🔥 LIMPIAR NOMBRE DEL AUDIO (CLAVE)
+        from pathlib import Path as PathLib
+        nombre_audio = PathLib(ruta_audio_metronomo).name
+        
+        # 🔥 ARMAR RUTA CORRECTA
+        metronome_path = BASE_DIR / "audios" / "rampa" / nombre_audio
+        
         output_dir = Path(output_dir_raw) if output_dir_raw else (BASE_DIR / "analysis_outputs" / video_path.stem)
+        
+        # DEBUG (opcional pero recomendable)
+        print("DEBUG audio final:", metronome_path)
 
         if not video_path.exists():
             return jsonify({"status": "error", "message": f"No existe el video: {video_path}"}), 404
