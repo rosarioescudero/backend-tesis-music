@@ -250,8 +250,11 @@ def analizar():
         from pathlib import Path as PathLib
         nombre_audio = PathLib(ruta_audio_metronomo).name
         
-        # 🔥 ARMAR RUTA CORRECTA
-        metronome_path = BASE_DIR / "audios" / "rampa" / nombre_audio
+        # 🔥 EXTRAER CARPETA (ej: PR+10)
+        carpeta = nombre_audio.split("__")[0]
+        
+        # 🔥 RUTA CORRECTA CON SUBCARPETA
+        metronome_path = BASE_DIR / "audios" / "rampa" / carpeta / nombre_audio
         
         output_dir = Path(output_dir_raw) if output_dir_raw else (BASE_DIR / "analysis_outputs" / video_path.stem)
         
