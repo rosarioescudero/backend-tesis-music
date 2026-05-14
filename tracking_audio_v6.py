@@ -2330,34 +2330,16 @@ def _construir_tramos_unificados(tipo, metadata, cambios, output_video, iti_vide
 # ==============================================================================
 
 if __name__ == '__main__':
-    resultado = run_analysis()
-
-# ==============================================================================
-# CELDAS DE DIAGNÓSTICO (ejecutar manualmente en Colab)
-# ==============================================================================
-
-# --- Ver JSON generado ---
-# import json, glob
-# json_files = glob.glob('/content/*_datos_sesion.json')
-# if json_files:
-#     with open(json_files[0], 'r', encoding='utf-8') as f:
-#         data = json.load(f)
-#     print(json.dumps(data, indent=4, ensure_ascii=False))
-
-# --- Mostrar gráfico de inspección tip_y ---
-# import glob
-# from IPython.display import Image, display
-# files = glob.glob('/content/*_inspeccion_tip_y.png')
-# if files: display(Image(filename=files[0]))
-
-# --- Mostrar señal sincronizada ---
-# files = glob.glob('/content/*_senal_sincronizada.png')
-# if files: display(Image(filename=files[0]))
-
-# --- Mostrar validación del mapeo ISO ---
-# files = glob.glob('/content/*_validacion_mapeo_iso.png')
-# if files: display(Image(filename=files[0]))
-
-# --- Mostrar asincronía audio temporal ---
-# files = glob.glob('/content/*_asincronia_audio_temporal.png')
-# if files: display(Image(filename=files[0]))
+    # Leer rutas desde las variables de entorno que manda la API
+    v_path = os.environ.get("ANALYSIS_VIDEO_PATH")
+    m_path = os.environ.get("ANALYSIS_METRONOME_PATH")
+    o_dir  = os.environ.get("ANALYSIS_OUTPUT_DIR")
+    
+    # Configuración para que no intente abrir ventanas de gráficos en el servidor
+    config = {
+        'GRAFICAR': False,
+        'OUTPUT_DIR': o_dir if o_dir else "/tmp"
+    }
+    
+    # Ejecutar
+    resultado = run_analysis(video_path=v_path, metronome_path=m_path, config=config)
