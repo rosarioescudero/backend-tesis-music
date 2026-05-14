@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 BASE_DIR = Path(__file__).resolve().parent
-SCRIPT_PATH = BASE_DIR / "analyze_video.py"
+SCRIPT_PATH = BASE_DIR / "tracking_audio_v6.py"
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
 REQUIRED_PACKAGES = {
     "cv2": "opencv-python==4.8.0.74",
