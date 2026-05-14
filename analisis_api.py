@@ -158,6 +158,7 @@ def run_real_analysis(video_path: Path, metronome_path: Path, output_dir: Path):
 
     clean_output_dir(output_dir)
 
+    # Preparamos las variables que el script nuevo necesita
     env = os.environ.copy()
     env.update(
         {
@@ -170,6 +171,7 @@ def run_real_analysis(video_path: Path, metronome_path: Path, output_dir: Path):
         }
     )
 
+    # Ejecutamos el nuevo script tracking_audio_v6.py
     process = subprocess.run(
         [sys.executable, str(SCRIPT_PATH)],
         cwd=str(BASE_DIR),
@@ -178,7 +180,9 @@ def run_real_analysis(video_path: Path, metronome_path: Path, output_dir: Path):
         text=True,
     )
 
-    manifest_path = output_dir / "analysis_results.json"
+    # 🔥 Lógica para encontrar el JSON con el nombre dinámico
+    manifest_path = output_dir / f"{video_path.stem}_datos_sesion.json"
+    
     if process.returncode != 0:
         stdout_tail = process.stdout[-2500:] if process.stdout else ""
         stderr_tail = process.stderr[-2500:] if process.stderr else ""
@@ -187,14 +191,15 @@ def run_real_analysis(video_path: Path, metronome_path: Path, output_dir: Path):
             f"STDOUT (final):\n{stdout_tail}\n\nSTDERR (final):\n{stderr_tail}"
         )
 
+    # Si por alguna razón el nombre falla, buscamos cualquier archivo .json que haya generado
     if not manifest_path.exists():
-        stdout_tail = process.stdout[-2500:] if process.stdout else ""
-        stderr_tail = process.stderr[-2500:] if process.stderr else ""
-        raise RuntimeError(
-            "El script terminó pero no generó analysis_results.json.\n"
-            f"STDOUT (final):\n{stdout_tail}\n\nSTDERR (final):\n{stderr_tail}"
-        )
+        json_files = list(output_dir.glob("*.json"))
+        if json_files:
+            manifest_path = json_files[0]
+        else:
+            raise RuntimeError(f"El script terminó pero no generó el JSON de resultados en {output_dir}")
 
+    # Leemos los resultados del JSON
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     logs = {
         "stdout": process.stdout,
