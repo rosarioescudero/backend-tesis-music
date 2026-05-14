@@ -166,6 +166,7 @@ def run_real_analysis(video_path: Path, metronome_path: Path, output_dir: Path):
         "ANALYSIS_SHOW_PLOTS": "0"
     })
 
+    # Ejecutamos el script
     process = subprocess.run(
         [sys.executable, str(SCRIPT_PATH)],
         cwd=str(BASE_DIR),
@@ -174,23 +175,21 @@ def run_real_analysis(video_path: Path, metronome_path: Path, output_dir: Path):
         text=True,
     )
 
+    # 🔥 SI EL SCRIPT FALLA, ESTO NOS DIRÁ POR QUÉ EN RENDER
     if process.returncode != 0:
-        # Esto nos va a decir en el log de Render EXACTAMENTE qué falló
-        print("ERROR EN EL SCRIPT:", process.stderr)
-        raise RuntimeError(f"El script falló con error: {process.stderr[:500]}")
+        print("--- ERROR DETALLADO DEL SCRIPT ---")
+        print(process.stderr)
+        print("---------------------------------")
+        raise RuntimeError(f"El motor de análisis falló. Error: {process.stderr[:200]}")
 
-    # 🔥 BUSCADOR INTELIGENTE: Buscamos cualquier JSON en la carpeta de salida
+    # 🔥 BUSCADOR DETECTIVE: Buscamos cualquier JSON generado
     json_files = list(output_dir.glob("*.json"))
-    
     if not json_files:
-        print("STDOUT del script:", process.stdout)
-        print("STDERR del script:", process.stderr)
-        raise RuntimeError("El script terminó pero no generó ningún archivo JSON de resultados.")
+        raise RuntimeError(f"El script terminó pero no generó resultados en {output_dir}")
 
-    # Usamos el primer JSON que encuentre
+    # Leemos el primer JSON que encontremos
     manifest_path = json_files[0]
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    
     return manifest, {"stdout": process.stdout, "stderr": process.stderr}
 
 
