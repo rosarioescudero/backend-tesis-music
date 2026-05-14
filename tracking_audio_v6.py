@@ -2330,16 +2330,20 @@ def _construir_tramos_unificados(tipo, metadata, cambios, output_video, iti_vide
 # ==============================================================================
 
 if __name__ == '__main__':
-    # Leer rutas desde las variables de entorno que manda la API
+    import os
+    # Capturamos las rutas que nos manda la API (analisis_api.py)
     v_path = os.environ.get("ANALYSIS_VIDEO_PATH")
     m_path = os.environ.get("ANALYSIS_METRONOME_PATH")
     o_dir  = os.environ.get("ANALYSIS_OUTPUT_DIR")
     
-    # Configuración para que no intente abrir ventanas de gráficos en el servidor
-    config = {
-        'GRAFICAR': False,
-        'OUTPUT_DIR': o_dir if o_dir else "/tmp"
+    # Configuramos para que no explote en el servidor
+    config_server = {
+        'GRAFICAR': False, # No queremos ventanas de gráficos en Render
+        'OUTPUT_DIR': o_dir if o_dir else "./analysis_outputs"
     }
     
-    # Ejecutar
-    resultado = run_analysis(video_path=v_path, metronome_path=m_path, config=config)
+    # Ejecutamos pasando los parámetros reales
+    if v_path and m_path:
+        resultado = run_analysis(video_path=v_path, metronome_path=m_path, config=config_server)
+    else:
+        print("Error: No se recibieron rutas de video o metrónomo.")
