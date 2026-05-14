@@ -96,8 +96,7 @@ CAMBIOS HEREDADOS DE v5 (todos conservados):
 # ==============================================================================
 # INSTALACIÓN DE DEPENDENCIAS (Colab — descomentar si es necesario)
 # ==============================================================================
-!pip install mediapipe
-!wget -q https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task
+
 
 # ==============================================================================
 # IMPORTS
@@ -107,6 +106,23 @@ import mediapipe as mp
 import pandas as pd
 import numpy as np
 import os
+
+import requests # Si no tenés esta línea, agregala
+
+# --- PARCHE PARA EL MODELO ---
+MODEL_PATH = "hand_landmarker.task"
+if not os.path.exists(MODEL_PATH):
+    print("Descargando modelo de MediaPipe...")
+    url = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
+    try:
+        response = requests.get(url)
+        with open(MODEL_PATH, "wb") as f:
+            f.write(response.content)
+        print("Modelo descargado con éxito.")
+    except Exception as e:
+        print(f"Error al descargar el modelo: {e}")
+# ------------------------------
+
 import re
 import json
 import warnings
