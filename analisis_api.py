@@ -158,20 +158,14 @@ def run_real_analysis(video_path: Path, metronome_path: Path, output_dir: Path):
 
     clean_output_dir(output_dir)
 
-    # Preparamos las variables que el script nuevo necesita
     env = os.environ.copy()
-    env.update(
-        {
-            "ANALYSIS_VIDEO_PATH": str(video_path.resolve()),
-            "ANALYSIS_METRONOME_PATH": str(metronome_path.resolve()),
-            "ANALYSIS_OUTPUT_DIR": str(output_dir.resolve()),
-            "ANALYSIS_INPUT_DIR": str(video_path.parent.resolve()),
-            "ANALYSIS_SHOW_PLOTS": "0",
-            "ANALYSIS_ENABLE_SOURCE_SEPARATION": "0",
-        }
-    )
+    env.update({
+        "ANALYSIS_VIDEO_PATH": str(video_path.resolve()),
+        "ANALYSIS_METRONOME_PATH": str(metronome_path.resolve()),
+        "ANALYSIS_OUTPUT_DIR": str(output_dir.resolve()),
+        "ANALYSIS_SHOW_PLOTS": "0"
+    })
 
-    # Ejecutamos el nuevo script tracking_audio_v6.py
     process = subprocess.run(
         [sys.executable, str(SCRIPT_PATH)],
         cwd=str(BASE_DIR),
@@ -180,32 +174,24 @@ def run_real_analysis(video_path: Path, metronome_path: Path, output_dir: Path):
         text=True,
     )
 
-    # 🔥 Lógica para encontrar el JSON con el nombre dinámico
-    manifest_path = output_dir / f"{video_path.stem}_datos_sesion.json"
-    
     if process.returncode != 0:
-        stdout_tail = process.stdout[-2500:] if process.stdout else ""
-        stderr_tail = process.stderr[-2500:] if process.stderr else ""
-        raise RuntimeError(
-            "El script de análisis falló.\n"
-            f"STDOUT (final):\n{stdout_tail}\n\nSTDERR (final):\n{stderr_tail}"
-        )
+        # Esto nos va a decir en el log de Render EXACTAMENTE qué falló
+        print("ERROR EN EL SCRIPT:", process.stderr)
+        raise RuntimeError(f"El script falló con error: {process.stderr[:500]}")
 
-    # Si por alguna razón el nombre falla, buscamos cualquier archivo .json que haya generado
-    if not manifest_path.exists():
-        json_files = list(output_dir.glob("*.json"))
-        if json_files:
-            manifest_path = json_files[0]
-        else:
-            raise RuntimeError(f"El script terminó pero no generó el JSON de resultados en {output_dir}")
+    # 🔥 BUSCADOR INTELIGENTE: Buscamos cualquier JSON en la carpeta de salida
+    json_files = list(output_dir.glob("*.json"))
+    
+    if not json_files:
+        print("STDOUT del script:", process.stdout)
+        print("STDERR del script:", process.stderr)
+        raise RuntimeError("El script terminó pero no generó ningún archivo JSON de resultados.")
 
-    # Leemos los resultados del JSON
+    # Usamos el primer JSON que encuentre
+    manifest_path = json_files[0]
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    logs = {
-        "stdout": process.stdout,
-        "stderr": process.stderr,
-    }
-    return manifest, logs
+    
+    return manifest, {"stdout": process.stdout, "stderr": process.stderr}
 
 
 @app.route("/health", methods=["GET"])
