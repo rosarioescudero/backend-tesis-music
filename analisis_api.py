@@ -228,7 +228,8 @@ def analizar():
             ruta_video = temp_file.name
             print("DEBUG ruta_video DESPUÉS:", ruta_video)
         nombre_archivo = datos.get("nombre_archivo")
-        output_dir_raw = datos.get("output_dir")
+        output_dir = BASE_DIR / "analysis_results"
+        output_dir.mkdir(parents=True, exist_ok=True)
 
         if not ruta_video:
             return jsonify({"status": "error", "message": "Falta 'ruta_video' en la petición."}), 400
