@@ -13,3 +13,4 @@ dtaidistance
 flask
 flask-cors
 gunicorn
+requests
