@@ -199,81 +199,71 @@ def health():
 
 
 @app.route("/analizar", methods=["POST"])
+@app.route("/analizar", methods=["POST"])
 def analizar():
     try:
+        import traceback
         datos = request.get_json(silent=True) or {}
-        ruta_video = datos.get("ruta_video")
-        print("DEBUG ruta_video ANTES:", ruta_video)
+        ruta_video_original = datos.get("ruta_video")
         ruta_audio_metronomo = datos.get("ruta_audio_metronomo")
+        print(f"DEBUG: Iniciando análisis para {ruta_video_original}")
 
         import requests
         import tempfile
         
-        # Si es URL, descargar el video
-        if isinstance(ruta_video, str) and ruta_video.startswith("http"):
-            response = requests.get(ruta_video)
+        # 1. Descargamos el video a una carpeta temporal
+        if not ruta_video_original or not ruta_video_original.startswith("http"):
+            return jsonify({"status": "error", "message": "Falta URL del video"}), 400
             
-            if response.status_code != 200:
-                return jsonify({
-                    "status": "error",
-                    "message": f"No se pudo descargar el video desde la URL: {ruta_video}"
-                }), 400
+        response = requests.get(ruta_video_original)
+        temp_video = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
+        with open(temp_video.name, "wb") as f:
+            f.write(response.content)
+        ruta_video_local = temp_video.name
+        print(f"DEBUG: Video descargado en {ruta_video_local}")
+
+        # 2. 🔥 BUSCADOR DE AUDIO INTELIGENTE (Soporta ISO, PA y PR)
+        nombre_audio = Path(ruta_audio_metronomo).name
+        carpeta_met = nombre_audio.split("__")[0] if "__" in nombre_audio else ""
         
-            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
-            
-            with open(temp_file.name, "wb") as f:
-                f.write(response.content)
-            
-            ruta_video = temp_file.name
-            print("DEBUG ruta_video DESPUÉS:", ruta_video)
-        nombre_archivo = datos.get("nombre_archivo")
+        # Probamos todas las carpetas posibles
+        posibles_rutas = [
+            BASE_DIR / "audios" / "rampa" / carpeta_met / nombre_audio,
+            BASE_DIR / "audios" / "isocronos" / nombre_audio,
+            BASE_DIR / "audios" / "abruptos" / carpeta_met / nombre_audio,
+            BASE_DIR / "audios" / nombre_audio # Por si acaso
+        ]
+        
+        metronome_path = None
+        for p in posibles_rutas:
+            if p.exists():
+                metronome_path = p
+                break
+        
+        if not metronome_path:
+            print(f"ERROR: No se encontró el metrónomo {nombre_audio} en ninguna carpeta.")
+            return jsonify({"status": "error", "message": f"Audio no encontrado: {nombre_audio}"}), 404
+
+        # 3. Carpeta de salida local en Python
         output_dir = BASE_DIR / "analysis_results"
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        if not ruta_video:
-            return jsonify({"status": "error", "message": "Falta 'ruta_video' en la petición."}), 400
-        if not ruta_audio_metronomo:
-            return jsonify({"status": "error", "message": "Falta 'ruta_audio_metronomo' en la petición."}), 400
+        # 4. Ejecutamos el análisis
+        print(f"DEBUG: Ejecutando motor con metrónomo: {metronome_path}")
+        manifest, logs = run_real_analysis(Path(ruta_video_local), metronome_path, output_dir)
 
-        video_path = Path(ruta_video)
+        return jsonify({
+            "status": "success",
+            "mensaje": "Análisis completado",
+            "metadata_extraida": manifest.get("metadata") or extract_metadata_from_filename(nombre_audio),
+            "analisis": manifest,
+            "logs_python": logs["stderr"][-500:] # Mandamos el final del log por si acaso
+        })
 
-        # 🔥 LIMPIAR NOMBRE DEL AUDIO (CLAVE)
-        from pathlib import Path as PathLib
-        nombre_audio = PathLib(ruta_audio_metronomo).name
-        
-        # 🔥 EXTRAER CARPETA (ej: PR+10)
-        carpeta = nombre_audio.split("__")[0]
-        
-        # 🔥 RUTA CORRECTA CON SUBCARPETA
-        metronome_path = BASE_DIR / "audios" / "rampa" / carpeta / nombre_audio
-        
-        output_dir = Path(output_dir_raw) if output_dir_raw else (BASE_DIR / "analysis_outputs" / video_path.stem)
-        
-        # DEBUG (opcional pero recomendable)
-        print("DEBUG audio final:", metronome_path)
-
-        if not video_path.exists():
-            return jsonify({"status": "error", "message": f"No existe el video: {video_path}"}), 404
-        if not metronome_path.exists():
-            return jsonify({"status": "error", "message": f"No existe el audio del metrónomo: {metronome_path}"}), 404
-        if video_path.suffix.lower() not in VIDEO_EXTENSIONS:
-            return jsonify({"status": "error", "message": "El archivo recibido no tiene una extensión de video soportada."}), 400
-
-        missing_packages = get_missing_packages()
-        if missing_packages:
-            paquetes = " ".join(item["package"] for item in missing_packages)
-            return jsonify(
-                {
-                    "status": "error",
-                    "message": (
-                        "Faltan dependencias de Python para ejecutar el análisis real. "
-                        f"Módulos ausentes: {', '.join(item['module'] for item in missing_packages)}."
-                    ),
-                    "missing_packages": missing_packages,
-                    "install_command": f'"{sys.executable}" -m pip install -r "{BASE_DIR / "requirements-analisis.txt"}"',
-                    "install_packages_command": f'"{sys.executable}" -m pip install {paquetes}',
-                }
-            ), 500
+    except Exception as error:
+        print("--- CRASH EN EL BACKEND ---")
+        traceback.print_exc() # Esto imprime el error real en la consola de Render
+        return jsonify({"status": "error", "message": f"Error interno: {str(error)}"}), 500
 
         inspection = inspect_video(video_path)
         manifest, logs = run_real_analysis(video_path, metronome_path, output_dir)
