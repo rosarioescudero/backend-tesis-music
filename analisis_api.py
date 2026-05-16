@@ -83,27 +83,22 @@ def clean_output_dir(output_dir: Path) -> None:
             child.unlink()
 
 def run_real_analysis(video_path: Path, metronome_path: Path, output_dir: Path):
-    # 🔥 SOLUCIÓN DE MEMORIA: Importamos el script internamente para ahorrar 250MB de RAM
+    # 🔥 IMPORTACIÓN INTERNA MAESTRA: Ahorra 250MB de RAM compartiendo el proceso
     import tracking_audio_v6
-    
     clean_output_dir(output_dir)
-    
     config = {
         'GRAFICAR': False,
         'OUTPUT_DIR': str(output_dir.resolve())
     }
-    
-    print("DEBUG: Ejecutando motor de análisis internamente en la misma memoria...")
+    print("DEBUG: Ejecutando motor de análisis internamente...")
     manifest = tracking_audio_v6.run_analysis(
         video_path=str(video_path.resolve()),
         metronome_path=str(metronome_path.resolve()),
         config=config
     )
-    
     if not manifest:
-        raise RuntimeError("El motor de análisis se ejecutó pero no retornó datos válidos.")
-        
-    return manifest, {"stdout": "Ejecución interna exitosa", "stderr": ""}
+        raise RuntimeError("El motor de análisis no retornó resultados.")
+    return manifest, {"stdout": "OK", "stderr": ""}
 
 @app.route("/health", methods=["GET"])
 def health():
@@ -120,7 +115,6 @@ def analizar():
         print(f"DEBUG: Iniciando análisis para {ruta_video_original}")
 
         import requests
-        import tempfile
         
         if not ruta_video_original or not ruta_video_original.startswith("http"):
             return jsonify({"status": "error", "message": "Falta URL del video"}), 400
@@ -128,7 +122,7 @@ def analizar():
         if not nombre_archivo:
             nombre_archivo = ruta_video_original.split("/")[-1]
 
-        # Descargamos el video eficientemente por chunks
+        # Descargamos el video eficientemente con nombre real
         video_dir = BASE_DIR / "temp_videos"
         video_dir.mkdir(parents=True, exist_ok=True)
         ruta_video_local = video_dir / nombre_archivo
@@ -140,12 +134,10 @@ def analizar():
         with open(ruta_video_local, "wb") as f:
             for chunk in response.iter_content(chunk_size=8192):
                 f.write(chunk)
-        print("DEBUG: Video descargado con éxito.")
 
         # Buscador inteligente de metrónomos
         nombre_audio = Path(ruta_audio_metronomo).name
         carpeta_met = nombre_audio.split("__")[0] if "__" in nombre_audio else ""
-        
         posibles_rutas = [
             BASE_DIR / "audios" / "rampa" / carpeta_met / nombre_audio,
             BASE_DIR / "audios" / "isocronos" / nombre_audio,
@@ -166,33 +158,22 @@ def analizar():
         output_dir.mkdir(parents=True, exist_ok=True)
 
         inspection = inspect_video(ruta_video_local)
-
-        # Ejecutamos el análisis real compartiendo el proceso
         manifest, logs = run_real_analysis(ruta_video_local, metronome_path, output_dir)
 
-        # Transformamos las rutas locales de gráficos en URLs reales de internet
-        public_graficos = []
-        if isinstance(manifest, dict) and "graficos" in manifest:
-            for g_path in manifest["graficos"]:
-                filename = Path(g_path).name
-                public_graficos.append(f"https://backend-tesis-music.onrender.com/results/{filename}")
+        # Escaneamos las imágenes generadas por el script
+        png_files = list(output_dir.glob("*.png"))
+        public_graficos = [f"https://backend-tesis-music.onrender.com/results/{f.name}" for f in png_files]
 
-        # Limpiamos el almacenamiento borrando el video analizado
         if ruta_video_local.exists():
             ruta_video_local.unlink()
 
-        # Aseguramos la estructura para script.js
         if isinstance(manifest, dict) and "video" not in manifest:
             manifest["video"] = inspection.get("video", {})
 
         return jsonify({
             "status": "success",
-            "mensaje": "Video procesado correctamente con el análisis real.",
+            "mensaje": "Análisis completado",
             "archivo": nombre_archivo,
-            "ruta_video": str(ruta_video_local.resolve()),
-            "ruta_audio_metronomo": str(metronome_path.resolve()),
-            "tamano_bytes": inspection["tamano_bytes"],
-            "tamano_mb": inspection["tamano_mb"],
             "metadata_extraida": manifest.get("metadata") or extract_metadata_from_filename(nombre_archivo),
             "analisis": manifest,
             "graficos": public_graficos,
