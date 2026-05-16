@@ -1,1 +1,1 @@
-web: python analisis_api.py
+web: gunicorn analisis_api:app --timeout 600
