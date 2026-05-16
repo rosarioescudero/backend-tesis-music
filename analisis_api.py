@@ -200,38 +200,48 @@ def health():
 
 @app.route("/analizar", methods=["POST"])
 @app.route("/analizar", methods=["POST"])
+@app.route("/analizar", methods=["POST"])
 def analizar():
     try:
         import traceback
         datos = request.get_json(silent=True) or {}
         ruta_video_original = datos.get("ruta_video")
         ruta_audio_metronomo = datos.get("ruta_audio_metronomo")
+        nombre_archivo = datos.get("nombre_archivo")
         print(f"DEBUG: Iniciando análisis para {ruta_video_original}")
 
         import requests
-        import tempfile
         
-        # 1. Descargamos el video a una carpeta temporal
         if not ruta_video_original or not ruta_video_original.startswith("http"):
             return jsonify({"status": "error", "message": "Falta URL del video"}), 400
             
-        response = requests.get(ruta_video_original)
-        temp_video = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
-        with open(temp_video.name, "wb") as f:
-            f.write(response.content)
-        ruta_video_local = temp_video.name
-        print(f"DEBUG: Video descargado en {ruta_video_local}")
+        # Si no viene el nombre del archivo, lo extraemos de la URL
+        if not nombre_archivo:
+            nombre_archivo = ruta_video_original.split("/")[-1]
+            
+        # 1. 🔥 CAMBIO CLAVE: Descargamos el video con su NOMBRE REAL ORIGINAL
+        video_dir = BASE_DIR / "temp_videos"
+        video_dir.mkdir(parents=True, exist_ok=True)
+        ruta_video_local = video_dir / nombre_archivo
+        
+        print(f"DEBUG: Descargando video con su nombre real en {ruta_video_local}...")
+        response = requests.get(ruta_video_original, stream=True)
+        response.raise_for_status()
+        
+        with open(ruta_video_local, "wb") as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+        print("DEBUG: Video descargado con éxito.")
 
-        # 2. 🔥 BUSCADOR DE AUDIO INTELIGENTE (Soporta ISO, PA y PR)
+        # 2. BUSCADOR DE AUDIO INTELIGNETE (Soporta ISO, PA y PR)
         nombre_audio = Path(ruta_audio_metronomo).name
         carpeta_met = nombre_audio.split("__")[0] if "__" in nombre_audio else ""
         
-        # Probamos todas las carpetas posibles
         posibles_rutas = [
             BASE_DIR / "audios" / "rampa" / carpeta_met / nombre_audio,
             BASE_DIR / "audios" / "isocronos" / nombre_audio,
             BASE_DIR / "audios" / "abruptos" / carpeta_met / nombre_audio,
-            BASE_DIR / "audios" / nombre_audio # Por si acaso
+            BASE_DIR / "audios" / nombre_audio
         ]
         
         metronome_path = None
@@ -248,53 +258,26 @@ def analizar():
         output_dir = BASE_DIR / "analysis_results"
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        # 4. Ejecutamos el análisis
+        # 4. Ejecutamos el análisis pasando el archivo con el nombre correcto
         print(f"DEBUG: Ejecutando motor con metrónomo: {metronome_path}")
-        manifest, logs = run_real_analysis(Path(ruta_video_local), metronome_path, output_dir)
+        manifest, logs = run_real_analysis(ruta_video_local, metronome_path, output_dir)
+
+        # Limpieza de seguridad para no llenar el almacenamiento de Render
+        if ruta_video_local.exists():
+            ruta_video_local.unlink()
 
         return jsonify({
             "status": "success",
             "mensaje": "Análisis completado",
-            "metadata_extraida": manifest.get("metadata") or extract_metadata_from_filename(nombre_audio),
+            "metadata_extraida": manifest.get("metadata") or extract_metadata_from_filename(nombre_archivo),
             "analisis": manifest,
-            "logs_python": logs["stderr"][-500:] # Mandamos el final del log por si acaso
+            "logs_python": logs["stderr"][-500:]
         })
 
     except Exception as error:
         print("--- CRASH EN EL BACKEND ---")
-        traceback.print_exc() # Esto imprime el error real en la consola de Render
+        traceback.print_exc()
         return jsonify({"status": "error", "message": f"Error interno: {str(error)}"}), 500
-
-        inspection = inspect_video(video_path)
-        manifest, logs = run_real_analysis(video_path, metronome_path, output_dir)
-
-        return jsonify(
-            {
-                "status": "success",
-                "mensaje": "Video procesado correctamente con el análisis real.",
-                "archivo": video_path.name,
-                "ruta_video": str(video_path.resolve()),
-                "ruta_audio_metronomo": str(metronome_path.resolve()),
-                "tamano_bytes": inspection["tamano_bytes"],
-                "tamano_mb": inspection["tamano_mb"],
-                "metadata_extraida": manifest.get("metadata") or extract_metadata_from_filename(nombre_archivo or video_path.name),
-                "analisis": {
-                    "motor": "analyze_video_colab_refactor",
-                    "video": inspection["video"],
-                    "output_dir": str(output_dir.resolve()),
-                    "stdout_preview": logs["stdout"][-4000:],
-                    "stderr_preview": logs["stderr"][-4000:],
-                },
-                "generated_files": manifest.get("generated_files", []),
-                "graficos": manifest.get("generated_plots", []),
-            }
-        )
-    except FileNotFoundError as error:
-        return jsonify({"status": "error", "message": str(error)}), 404
-    except RuntimeError as error:
-        return jsonify({"status": "error", "message": str(error)}), 500
-    except Exception as error:
-        return jsonify({"status": "error", "message": f"Error interno del análisis: {error}"}), 500
 
 
 if __name__ == "__main__":
