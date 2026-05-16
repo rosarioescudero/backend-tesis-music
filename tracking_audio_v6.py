@@ -141,8 +141,6 @@ import matplotlib
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from IPython.display import Audio, Image, display
-
 try:
     import plotly.graph_objects as go
     PLOTLY_DISPONIBLE = False
