@@ -198,8 +198,10 @@ def health():
     return jsonify({"status": "ok", "service": "analisis_api"})
 
 
-@app.route("/analizar", methods=["POST"])
-@app.route("/analizar", methods=["POST"])
+# 1. Asegurate de importar send_from_directory arriba de todo con Flask:
+from flask import Flask, jsonify, request, send_from_directory
+
+# 2. Reemplazá por completo la función analizar por esta versión optimizada para el Frontend:
 @app.route("/analizar", methods=["POST"])
 def analizar():
     try:
@@ -215,28 +217,24 @@ def analizar():
         if not ruta_video_original or not ruta_video_original.startswith("http"):
             return jsonify({"status": "error", "message": "Falta URL del video"}), 400
             
-        # Si no viene el nombre del archivo, lo extraemos de la URL
         if not nombre_archivo:
             nombre_archivo = ruta_video_original.split("/")[-1]
             
-        # 1. 🔥 CAMBIO CLAVE: Descargamos el video con su NOMBRE REAL ORIGINAL
         video_dir = BASE_DIR / "temp_videos"
         video_dir.mkdir(parents=True, exist_ok=True)
         ruta_video_local = video_dir / nombre_archivo
         
-        print(f"DEBUG: Descargando video con su nombre real en {ruta_video_local}...")
+        print(f"DEBUG: Descargando video en {ruta_video_local}...")
         response = requests.get(ruta_video_original, stream=True)
         response.raise_for_status()
         
         with open(ruta_video_local, "wb") as f:
             for chunk in response.iter_content(chunk_size=8192):
                 f.write(chunk)
-        print("DEBUG: Video descargado con éxito.")
 
-        # 2. BUSCADOR DE AUDIO INTELIGNETE (Soporta ISO, PA y PR)
+        # Buscador inteligente de audio
         nombre_audio = Path(ruta_audio_metronomo).name
         carpeta_met = nombre_audio.split("__")[0] if "__" in nombre_audio else ""
-        
         posibles_rutas = [
             BASE_DIR / "audios" / "rampa" / carpeta_met / nombre_audio,
             BASE_DIR / "audios" / "isocronos" / nombre_audio,
@@ -251,26 +249,40 @@ def analizar():
                 break
         
         if not metronome_path:
-            print(f"ERROR: No se encontró el metrónomo {nombre_audio} en ninguna carpeta.")
             return jsonify({"status": "error", "message": f"Audio no encontrado: {nombre_audio}"}), 404
 
-        # 3. Carpeta de salida local en Python
         output_dir = BASE_DIR / "analysis_results"
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        # 4. Ejecutamos el análisis pasando el archivo con el nombre correcto
-        print(f"DEBUG: Ejecutando motor con metrónomo: {metronome_path}")
+        # Extraemos los datos físicos del video antes de procesar/borrar
+        inspection = inspect_video(ruta_video_local)
+
+        # Ejecutamos el análisis real de señales
         manifest, logs = run_real_analysis(ruta_video_local, metronome_path, output_dir)
 
-        # Limpieza de seguridad para no llenar el almacenamiento de Render
+        # Convertimos los gráficos locales en URLs públicas de internet
+        public_graficos = []
+        if isinstance(manifest, dict) and "graficos" in manifest:
+            for g_path in manifest["graficos"]:
+                filename = Path(g_path).name
+                public_graficos.append(f"https://backend-tesis-music.onrender.com/results/{filename}")
+
+        # Limpieza del video temporal
         if ruta_video_local.exists():
             ruta_video_local.unlink()
+
+        # Aseguramos la estructura del JSON para script.js
+        if isinstance(manifest, dict) and "video" not in manifest:
+            manifest["video"] = inspection.get("video", {})
 
         return jsonify({
             "status": "success",
             "mensaje": "Análisis completado",
+            "archivo": nombre_archivo,
             "metadata_extraida": manifest.get("metadata") or extract_metadata_from_filename(nombre_archivo),
             "analisis": manifest,
+            "graficos": public_graficos, # Pasamos la lista de URLs directamente
+            "generated_files": [],
             "logs_python": logs["stderr"][-500:]
         })
 
@@ -279,8 +291,7 @@ def analizar():
         traceback.print_exc()
         return jsonify({"status": "error", "message": f"Error interno: {str(error)}"}), 500
 
-
-if __name__ == "__main__":
-    import os
-    print("Servidor de Python activo")
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+# 3. 🔥 AGREGÁ ESTA NUEVA RUTA AL FINAL DEL ARCHIVO (Antes del app.run):
+@app.route("/results/<filename>")
+def get_result_file(filename):
+    return send_from_directory(BASE_DIR / "analysis_results", filename)
